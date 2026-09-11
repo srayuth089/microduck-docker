@@ -374,6 +374,9 @@ A 45-minute lesson that needs no robotics background.
 
 <p align="center">
   Built and maintained by <a href="https://devos.bluweo.com/projects">srayuth</a>.<br>
-  If this saved you an afternoon of setup, or got a classroom running:<br>
-  <a href="https://buymeacoffee.com/srayuth"><b>☕ Buy me a coffee</b></a>
+  If this saved you an afternoon of setup, or got a classroom running:
+</p>
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/srayuth" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="60" width="217"></a>
 </p>

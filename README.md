@@ -2,6 +2,14 @@
 
 **The [Microduck](https://pollen-robotics.com/microduck) robot simulator — in one command.**
 
+<p align="center">
+  <a href="https://hub.docker.com/r/srayuth089/microduck-docker"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/srayuth089/microduck-docker?logo=docker&logoColor=white&color=2496ED"></a>
+  <a href="https://hub.docker.com/r/srayuth089/microduck-docker/tags"><img alt="Image size" src="https://img.shields.io/docker/image-size/srayuth089/microduck-docker/latest?logo=docker&logoColor=white"></a>
+  <a href="https://github.com/srayuth089/microduck-docker/actions/workflows/build.yml"><img alt="Build" src="https://github.com/srayuth089/microduck-docker/actions/workflows/build.yml/badge.svg"></a>
+  <img alt="Architectures" src="https://img.shields.io/badge/arch-amd64%20%7C%20arm64-informational">
+  <a href="https://www.buymeacoffee.com/srayuth"><img alt="Buy me a book" src="https://img.shields.io/badge/%F0%9F%93%96-buy%20me%20a%20book-FFDD00?labelColor=000000"></a>
+</p>
+
 Microduck is a 25 cm robot that walks on two legs, made by [Pollen Robotics](https://pollen-robotics.com)
 and open-sourced with Hugging Face. This image lets you **watch it walk, teach it
 tricks, and train your own robot brain** — in your browser, on the computer you
@@ -231,7 +239,13 @@ or ship it in a commercial product. See [NOTICE](NOTICE).
 ---
 
 <p align="center">
-  <i>Made for classrooms, kitchen tables and anyone curious about robots.</i><br>
-  <a href="https://buymeacoffee.com/srayuth">☕ Buy me a coffee</a> ·
-  <a href="https://devos.bluweo.com/projects">More projects</a>
+  <i>Made for classrooms, kitchen tables and anyone curious about robots.</i>
+</p>
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/srayuth" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="60" width="217"></a>
+</p>
+
+<p align="center">
+  <a href="https://devos.bluweo.com/projects">More projects by srayuth →</a>
 </p>
