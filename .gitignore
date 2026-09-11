@@ -1,0 +1,6 @@
+docs/media/*.png
+docs/media/*.json
+docs/media/*.log
+docs/media/*.txt
+.DS_Store
+*.tar

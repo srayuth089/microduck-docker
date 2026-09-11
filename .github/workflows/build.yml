@@ -1,0 +1,220 @@
+name: build & publish
+
+# Three ways in, one build path:
+#   * schedule — every Monday, pick up whatever upstream shipped that week
+#   * push     — validate changes to the image definition itself
+#   * manual   — "build it now", optionally for every exotic architecture
+on:
+  schedule:
+    - cron: "17 4 * * 1"          # Mondays 04:17 UTC (off the hour: less runner contention)
+  push:
+    branches: [main]
+    paths: [Dockerfile, entrypoint.sh, .github/workflows/build.yml]
+  pull_request:
+    paths: [Dockerfile, entrypoint.sh, .github/workflows/build.yml]
+  workflow_dispatch:
+    inputs:
+      all_arches:
+        description: "Also build ppc64le + s390x (slow: QEMU emulated)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ${{ vars.DOCKERHUB_USERNAME || 'srayuth089' }}/microduck-docker
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Resolve upstream refs to concrete SHAs ONCE, so every architecture in the
+  # matrix builds the identical source even if upstream pushes mid-run.
+  # -------------------------------------------------------------------------
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      lab_sha:      ${{ steps.r.outputs.lab_sha }}
+      rl_sha:       ${{ steps.r.outputs.rl_sha }}
+      policies_sha: ${{ steps.r.outputs.policies_sha }}
+      version:      ${{ steps.r.outputs.version }}
+      platforms:    ${{ steps.p.outputs.platforms }}
+      changed:      ${{ steps.r.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: r
+        name: Resolve upstream commits
+        run: |
+          set -euo pipefail
+          sha() { git ls-remote "$1" "$2" | cut -f1 | head -1; }
+
+          LAB=$(sha https://github.com/jonathanhawkins/microduck-lab.git main)
+          RL=$(sha  https://github.com/pollen-robotics/microduck_rl.git develop)
+          POL=$(sha https://github.com/IronSpiderMan/MicroDuckModels.git main)
+
+          for v in LAB RL POL; do
+            [ -n "${!v}" ] || { echo "::error::could not resolve $v upstream ref"; exit 1; }
+          done
+
+          echo "lab_sha=$LAB"      >> "$GITHUB_OUTPUT"
+          echo "rl_sha=$RL"        >> "$GITHUB_OUTPUT"
+          echo "policies_sha=$POL" >> "$GITHUB_OUTPUT"
+
+          # Version = date + short upstream fingerprint. Sorts chronologically,
+          # and two builds of identical upstream code get the identical tag.
+          FP=$(printf '%s%s%s' "$LAB" "$RL" "$POL" | sha256sum | cut -c1-7)
+          echo "version=$(date -u +%Y.%m.%d)-$FP" >> "$GITHUB_OUTPUT"
+
+          # Skip scheduled rebuilds when upstream has not moved. The
+          # fingerprint is in every published tag, so asking Docker Hub whether
+          # a tag named after THIS fingerprint exists answers "did anything
+          # change?" without storing state anywhere. Anonymous read of a public
+          # repo; any failure (rate limit, first-ever run, private repo) falls
+          # through to "changed", because a needless rebuild is cheap and a
+          # skipped real update is not.
+          TAGS_URL="https://hub.docker.com/v2/repositories/$IMAGE/tags/$(date -u +%Y.%m.%d)-$FP"
+          if [ "${{ github.event_name }}" = "schedule" ] \
+             && curl -fsS --max-time 20 "$TAGS_URL" >/dev/null 2>&1; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Upstream unchanged since the last build — skipping." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true"  >> "$GITHUB_OUTPUT"
+          fi
+
+          { echo "### Upstream resolved"
+            echo "| component | commit |"
+            echo "|---|---|"
+            echo "| microduck-lab | \`$LAB\` |"
+            echo "| microduck_rl  | \`$RL\` |"
+            echo "| policies      | \`$POL\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - id: p
+        name: Choose architectures
+        run: |
+          if [ "${{ inputs.all_arches }}" = "true" ]; then
+            echo "platforms=linux/amd64,linux/arm64,linux/ppc64le,linux/s390x" >> "$GITHUB_OUTPUT"
+          else
+            echo "platforms=linux/amd64,linux/arm64" >> "$GITHUB_OUTPUT"
+          fi
+
+  # -------------------------------------------------------------------------
+  # Smoke test on native amd64 BEFORE publishing: a broken image must never
+  # reach the people this project is for.
+  # -------------------------------------------------------------------------
+  test:
+    needs: resolve
+    if: needs.resolve.outputs.changed == 'true' || github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build (amd64, load into the local daemon)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: microduck-docker:test
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            LAB_SHA=${{ needs.resolve.outputs.lab_sha }}
+            RL_SHA=${{ needs.resolve.outputs.rl_sha }}
+            POLICIES_SHA=${{ needs.resolve.outputs.policies_sha }}
+            VERSION=${{ needs.resolve.outputs.version }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+
+      - name: Smoke test — does the simulator actually simulate?
+        run: |
+          set -euo pipefail
+          docker run --rm microduck-docker:test version
+          docker run --rm microduck-docker:test policies | tee /tmp/pol
+          grep -q BEST_alpha_walking /tmp/pol
+
+          docker run -d --name duck -p 127.0.0.1:63317:63317 \
+                     -p 127.0.0.1:8788:8788 microduck-docker:test
+          for i in $(seq 1 90); do
+            s=$(docker inspect -f '{{.State.Health.Status}}' duck 2>/dev/null || echo none)
+            [ "$s" = healthy ] && break
+            [ "$s" = unhealthy ] && { docker logs duck; exit 1; }
+            sleep 2
+          done
+          [ "$(docker inspect -f '{{.State.Health.Status}}' duck)" = healthy ] \
+            || { echo "::error::never became healthy"; docker logs duck; exit 1; }
+
+          # The physics must be producing a real scene, not just an open port.
+          curl -fsS localhost:8788/scene | head -c 200; echo
+          curl -fsS localhost:8788/scene | grep -q geom \
+            || { echo "::error::/scene returned no geometry"; exit 1; }
+          curl -fsS -o /dev/null localhost:63317/
+
+          docker logs duck | tail -20
+          docker rm -f duck
+
+  # -------------------------------------------------------------------------
+  # Publish multi-arch. Never runs on pull_request (no secrets, no push).
+  # -------------------------------------------------------------------------
+  publish:
+    needs: [resolve, test]
+    if: github.event_name != 'pull_request' && (needs.resolve.outputs.changed == 'true' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # to move the release tag
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME || 'srayuth089' }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: ${{ needs.resolve.outputs.platforms }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ needs.resolve.outputs.version }}
+          build-args: |
+            LAB_SHA=${{ needs.resolve.outputs.lab_sha }}
+            RL_SHA=${{ needs.resolve.outputs.rl_sha }}
+            POLICIES_SHA=${{ needs.resolve.outputs.policies_sha }}
+            VERSION=${{ needs.resolve.outputs.version }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+
+      - name: Update Docker Hub description
+        uses: peter-evans/dockerhub-description@v4
+        continue-on-error: true            # a README sync failing must not fail a good image
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME || 'srayuth089' }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: ${{ env.IMAGE }}
+          readme-filepath: ./README.md
+          short-description: "Microduck bipedal robot simulator — one command, runs in your browser 🦆"
+
+      - name: Tag the release
+        run: |
+          gh release create "v${{ needs.resolve.outputs.version }}" \
+            --title "v${{ needs.resolve.outputs.version }}" \
+            --notes "Built from upstream:
+          - microduck-lab \`${{ needs.resolve.outputs.lab_sha }}\`
+          - microduck_rl \`${{ needs.resolve.outputs.rl_sha }}\`
+          - policies \`${{ needs.resolve.outputs.policies_sha }}\`
+
+          \`\`\`
+          docker run --rm -p 63317:63317 -p 8788:8788 ${{ env.IMAGE }}:${{ needs.resolve.outputs.version }}
+          \`\`\`" \
+            || echo "release already exists, skipping"
+        env:
+          GH_TOKEN: ${{ github.token }}

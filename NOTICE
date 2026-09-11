@@ -1,0 +1,45 @@
+microduck-docker
+Copyright 2026 srayuth089
+
+This product packages, but does not modify the behaviour of, software and
+assets created by others. It is distributed under Apache License 2.0 (see
+LICENSE) with the exception noted below.
+
+================================================================================
+1. microduck_rl — Pollen Robotics
+   https://github.com/pollen-robotics/microduck_rl
+   Code:        Apache License 2.0
+   3D models:   Creative Commons BY-SA-NC  ***NON-COMMERCIAL***
+
+   The image includes the MJCF robot description and its STL meshes from
+   src/mjlab_microduck/robot/microduck. Because those assets carry the NC
+   clause, THE IMAGE AS A WHOLE MAY NOT BE USED COMMERCIALLY. Educational,
+   personal, research and hobby use are fine.
+
+2. microduck-lab — Jonathan Hawkins
+   https://github.com/jonathanhawkins/microduck-lab
+   Apache License 2.0
+
+   Provides microduck_local (the CPU MuJoCo + PPO harness and the duck-lab
+   server) and duck-viewer (the browser front end).
+
+   MODIFICATION: this image adds a --host flag to duck-lab's argument parser
+   so the server can bind inside a container's network namespace. The default
+   remains 127.0.0.1 and the origin checks are untouched; see the comment in
+   the Dockerfile for why this preserves upstream's loopback trust boundary.
+
+3. MicroDuckModels — IronSpiderMan
+   https://github.com/IronSpiderMan/MicroDuckModels
+   The pretrained .onnx policies in /app/policies. Upstream states that these
+   assets originate from Pollen Robotics' MicroDuck Simulator Space and asks
+   that the upstream project's license terms be followed; they are therefore
+   treated here as NON-COMMERCIAL, as in (1).
+
+4. Third-party Python and JavaScript dependencies are installed from PyPI and
+   npm under their own licenses. Run `docker run --rm IMAGE shell` and use
+   `pip list` / the SBOM attached to the published image for the full set.
+================================================================================
+
+If you are a rights holder and this packaging misrepresents your terms, please
+open an issue at https://github.com/srayuth089/microduck-docker/issues and it
+will be corrected or taken down.
