@@ -80,17 +80,6 @@ cmd_serve() {
   printf '  └%s┘\n' "────────────────────────────────────────────────"
   printf '\n'
 
-  ┌────────────────────────────────────────────────┐
-  │  🦆  Microduck is running!                     │
-  │                                                │
-  │  Open this in your browser:                    │
-  │      %-42s│
-  │                                                │
-  │  Press Ctrl+C here to stop.                    │
-  └────────────────────────────────────────────────┘
-
-BANNER
-
   # If either half dies, stop the other rather than leaving a half-lab up.
   trap 'kill "$lab_pid" "$web_pid" 2>/dev/null || true' INT TERM
   wait -n "$lab_pid" "$web_pid"
