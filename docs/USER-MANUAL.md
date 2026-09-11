@@ -369,3 +369,11 @@ A 45-minute lesson that needs no robotics background.
 ---
 
 *Questions and problems: <https://github.com/srayuth089/microduck-docker/issues>*
+
+---
+
+<p align="center">
+  Built and maintained by <a href="https://devos.bluweo.com/projects">srayuth</a>.<br>
+  If this saved you an afternoon of setup, or got a classroom running:<br>
+  <a href="https://buymeacoffee.com/srayuth"><b>☕ Buy me a coffee</b></a>
+</p>

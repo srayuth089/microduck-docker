@@ -131,7 +131,8 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm microduck-docker:test version
-          docker run --rm microduck-docker:test policies | tee /tmp/pol
+          docker run --rm microduck-docker:test policies > /tmp/pol
+          cat /tmp/pol
           grep -q BEST_alpha_walking /tmp/pol
 
           docker run -d --name duck -p 127.0.0.1:63317:63317 \
@@ -146,12 +147,20 @@ jobs:
             || { echo "::error::never became healthy"; docker logs duck; exit 1; }
 
           # The physics must be producing a real scene, not just an open port.
-          curl -fsS localhost:8788/scene | head -c 200; echo
-          curl -fsS localhost:8788/scene | grep -q geom \
-            || { echo "::error::/scene returned no geometry"; exit 1; }
+          # Write to a file first: piping curl into `head` closes the pipe early
+          # and curl exits 23, which under `pipefail` fails the job even though
+          # the simulator answered perfectly.
+          curl -fsS localhost:8788/scene -o /tmp/scene.json
+          head -c 300 /tmp/scene.json; echo
+
+          # A real scene has geometry AND the robot's actual skeleton.
+          grep -q geom  /tmp/scene.json || { echo "::error::/scene has no geometry"; exit 1; }
+          grep -q ankle /tmp/scene.json || { echo "::error::/scene has no robot bodies"; exit 1; }
+
           curl -fsS -o /dev/null localhost:63317/
 
-          docker logs duck | tail -20
+          docker logs duck > /tmp/duck.log 2>&1 || true
+          tail -20 /tmp/duck.log
           docker rm -f duck
 
   # -------------------------------------------------------------------------
