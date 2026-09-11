@@ -64,13 +64,27 @@ cmd_serve() {
   ( cd /app/viewer && PORT="$VIEWER_PORT" HOSTNAME=0.0.0.0 exec node server.js ) &
   local web_pid=$!
 
-  cat <<BANNER
+  # printf, not a heredoc: a heredoc cannot pad, and the URL row has to stay
+  # aligned whatever port the user mapped. Interior width is 48 columns; the
+  # duck emoji is one character but TWO columns wide, so its row is padded one
+  # space short on purpose.
+  local url="http://localhost:${VIEWER_PORT}"
+  printf '\n'
+  printf '  ┌%s┐\n' "────────────────────────────────────────────────"
+  printf '  │  🦆  Microduck is running!                     │\n'
+  printf '  │                                                │\n'
+  printf '  │  Open this in your browser:                    │\n'
+  printf '  │%s│\n' "$(printf '      %-42s' "$url")"
+  printf '  │                                                │\n'
+  printf '  │  Press Ctrl+C here to stop.                    │\n'
+  printf '  └%s┘\n' "────────────────────────────────────────────────"
+  printf '\n'
 
   ┌────────────────────────────────────────────────┐
   │  🦆  Microduck is running!                     │
   │                                                │
   │  Open this in your browser:                    │
-  │      http://localhost:${VIEWER_PORT}                 │
+  │      %-42s│
   │                                                │
   │  Press Ctrl+C here to stop.                    │
   └────────────────────────────────────────────────┘
