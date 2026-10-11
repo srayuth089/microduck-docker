@@ -247,5 +247,5 @@ or ship it in a commercial product. See [NOTICE](NOTICE).
 </p>
 
 <p align="center">
-  <a href="https://devos.bluweo.com/projects">More projects by srayuth →</a>
+  <a href="https://www.linkedin.com/in/srayuth-kamma-861222253/">More projects by srayuth →</a>
 </p>
