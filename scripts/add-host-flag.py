@@ -24,10 +24,13 @@ instead of shipping a broken (or silently unbound) server.
 """
 
 import pathlib
+import re
 
 import microduck_local.viz_server as vs
 
-ANCHOR = 'ap.add_argument("--port", type=int, default=8788)'
+# Match the --port line by shape, not its default: upstream has written that
+# default as 8788 and as DEFAULT_LAB_PORT, and the value is not ours to pin.
+ANCHOR = re.compile(r'ap\.add_argument\("--port", type=int, default=[^)\n]+\)')
 BIND = 'host="127.0.0.1", port=args.port'
 ADDITION = (
     '\n    ap.add_argument("--host", default="127.0.0.1",\n'
@@ -43,12 +46,13 @@ if "host=args.host" in src:
     print(f"already patched: {path}")
     raise SystemExit(0)
 
-if ANCHOR not in src:
+anchor = ANCHOR.search(src)
+if anchor is None:
     raise SystemExit(f"PATCH TARGET GONE: --port argument not found in {path}")
 if BIND not in src:
     raise SystemExit(f"PATCH TARGET GONE: uvicorn bind not found in {path}")
 
-src = src.replace(ANCHOR, ANCHOR + ADDITION, 1)
+src = src[:anchor.end()] + ADDITION + src[anchor.end():]
 src = src.replace(BIND, "host=args.host, port=args.port", 1)
 path.write_text(src)
 
